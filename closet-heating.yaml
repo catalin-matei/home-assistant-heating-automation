@@ -1,0 +1,47 @@
+alias: Heat closet based on hvac or running state
+description: ""
+triggers:
+  - entity_id: climate.closet
+    attribute: hvac_action
+    trigger: state
+  - entity_id: climate.closet
+    attribute: running_state
+    trigger: state
+  - seconds: /20
+    trigger: time_pattern
+  - event: start
+    trigger: homeassistant
+  - event_type: automation_reloaded
+    trigger: event
+actions:
+  - variables:
+      act: |-
+        {{
+          (state_attr('climate.closet','hvac_action')
+           or state_attr('climate.closet','running_state')
+           or '') | string | lower
+        }}
+      heat_on: "{{ act in ['heating','heat'] }}"
+      heat_off: "{{ act in ['idle','off'] }}"
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ heat_on }}"
+        sequence:
+          - target:
+              entity_id: switch.centrala
+            action: switch.turn_on
+      - conditions:
+          - condition: template
+            value_template: "{{ heat_off }}"
+        sequence:
+          - target:
+              entity_id: switch.centrala
+            action: switch.turn_off
+  - data:
+      name: THERMO
+      message: act={{ act }} → on={{ heat_on }} / off={{ heat_off }}
+      entity_id: climate.closet
+    action: logbook.log
+initial_state: true
+mode: restart
