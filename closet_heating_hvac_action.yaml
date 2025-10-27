@@ -1,0 +1,37 @@
+alias: Heating closet final
+triggers:
+  - entity_id: climate.closet
+    attribute: hvac_action
+    trigger: state
+  - seconds: /30
+    trigger: time_pattern
+  - event: start
+    trigger: homeassistant
+  - event_type: automation_reloaded
+    trigger: event
+actions:
+  - variables:
+      hvac: "{{ (state_attr('climate.closet','hvac_action') or '') | lower }}"
+      heating: "{{ hvac == 'heating' }}"
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ heating }}"
+        sequence:
+          - target:
+              entity_id: switch.centrala
+            action: switch.turn_on
+      - conditions:
+          - condition: template
+            value_template: "{{ not heating }}"
+        sequence:
+          - target:
+              entity_id: switch.centrala
+            action: switch.turn_off
+  - data:
+      name: THERMO
+      message: hvac_action={{ hvac }}
+      entity_id: climate.closet
+    action: logbook.log
+initial_state: true
+mode: restart
