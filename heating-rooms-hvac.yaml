@@ -1,0 +1,63 @@
+alias: Heat all rooms (hvac action)
+author: Catalin Matei
+description: 
+  If one room is in heating mode, turn on the boiler.
+
+  This automation is made with [thermostat](https://www.zigbee2mqtt.io/devices/TS0601_thermostat.html#tuya-ts0601-thermostat) and [switch](https://www.zigbee2mqtt.io/devices/GL-C-009P.html).
+triggers:
+  - trigger: state
+    # Add thermostat
+    entity_id:
+      - climate.closet
+      - climate.kitchen
+      - climate.hallway
+      - climate.big_bedroom
+      - climate.bedroom
+      - climate.bathroom_floor
+      - climate.0xa46dd4fffe96f8b3
+      - climate.bathroom
+      - climate.office
+      - climate.living_coach
+      - climate.living_tv
+    attribute: hvac_action
+  - trigger: homeassistant
+    event: start
+  - trigger: event
+    event_type: automation_reloaded
+actions:
+  - variables:
+      # Add thermostat
+      thermostats:
+        - climate.closet
+        - climate.kitchen
+        - climate.hallway
+        - climate.big_bedroom
+        - climate.bedroom
+        - climate.bathroom_floor
+        - climate.0xa46dd4fffe96f8b3
+        - climate.bathroom
+        - climate.office
+        - climate.living_coach
+        - climate.living_tv
+      hvacs: |-
+        {{
+          thermostats
+          | map('state_attr','hvac_action')
+          | map('string')
+          | map('lower')
+          | list
+        }}
+      any_heating: "{{ 'heating' in hvacs }}"
+  - if:
+      - condition: template
+        value_template: "{{ any_heating }}"
+    then:
+      - action: switch.turn_on
+        target:
+          entity_id: switch.centrala
+    else:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.centrala
+initial_state: true
+mode: restart
