@@ -1,0 +1,105 @@
+alias: Heat all rooms (hvac action)
+description: If one main room is in heating mode, turn on the boiler (TV & greenhouse are slaves)
+triggers:
+  - trigger: state
+    entity_id:
+      - climate.closet
+      - climate.living_coach
+      - climate.living_tv
+      - climate.dining
+      - climate.bathroom
+      - climate.greenhouse
+      - climate.kitchen
+    attribute: hvac_action
+  - trigger: homeassistant
+    event: start
+  - trigger: event
+    event_type: automation_reloaded
+
+actions:
+  - variables:
+      # Toate capetele (pt. triggere / debug)
+      thermostats:
+        - climate.closet
+        - climate.living_coach
+        - climate.living_tv
+        - climate.dining
+        - climate.bathroom
+        - climate.greenhouse
+        - climate.kitchen
+
+      # Capete care CONTROLEAZĂ centrala (fara living_tv & greenhouse)
+      thermostats_boiler:
+        - climate.closet
+        - climate.living_coach
+        - climate.dining
+        - climate.bathroom
+        - climate.kitchen
+
+      hvacs_boiler: >-
+        {{
+          thermostats_boiler
+          | map('state_attr', 'hvac_action')
+          | map('string')
+          | map('lower')
+          | list
+        }}
+
+      any_heating_main: "{{ 'heating' in hvacs_boiler }}"
+
+      coach_heating: "{{ state_attr('climate.living_coach', 'hvac_action') == 'heating' }}"
+      kitchen_heating: "{{ state_attr('climate.kitchen', 'hvac_action') == 'heating' }}"
+
+  # Slave 1: living_tv urmează living_coach sau se duce la 5°C
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ coach_heating }}"
+        sequence:
+          - action: climate.set_temperature
+            target:
+              entity_id: climate.living_tv
+            data:
+              temperature: >
+                {{ state_attr('climate.living_coach', 'current_heating_setpoint') }}
+    default:
+      - action: climate.set_temperature
+        target:
+          entity_id: climate.living_tv
+        data:
+          temperature: 5
+
+  # Slave 2: greenhouse urmează kitchen sau se duce la 5°C
+  - choose:
+      - conditions:
+          - condition: template
+            value_template: "{{ kitchen_heating }}"
+        sequence:
+          - action: climate.set_temperature
+            target:
+              entity_id: climate.greenhouse
+            data:
+              temperature: >
+                {{ state_attr('climate.kitchen', 'current_heating_setpoint') }}
+    default:
+      - action: climate.set_temperature
+        target:
+          entity_id: climate.greenhouse
+        data:
+          temperature: 5
+
+  # Control centrală DOAR din capetele principale
+  - if:
+      - condition: template
+        value_template: "{{ any_heating_main }}"
+    then:
+      - action: switch.turn_on
+        target:
+          entity_id: switch.centrala
+    else:
+      - action: switch.turn_off
+        target:
+          entity_id: switch.centrala
+
+initial_state: true
+mode: restart
